@@ -1,0 +1,204 @@
+
+///////////////////////////////////////////////////////////
+// File: PushBullet v1.0.0.usp
+// Programmer:	Keith Carlson
+// Purpose: Gold Exam - Part 1		
+// Comments:
+// Rev:			Initial Release
+///////////////////////////////////////////////////////////
+
+#user_simplsharp_library "PushBullet"
+#digital_expand   		InputsWithOutputs 
+ 
+#define_constant		cMax_Messages 25
+#define_constant		cMax_MessageSize 64
+
+                              
+///// I/O /////////////////////////////////////////////////
+digital_input			_SKIP_;
+digital_input			_SKIP_;
+digital_input			_SKIP_;
+digital_input			_SKIP_;
+digital_input			Initialize;
+digital_input			_SKIP_;
+digital_input			Reset_Connection;
+digital_input			Close_Connection;
+digital_input			_SKIP_;
+digital_input			Update_Messages;
+digital_input			Delete_All_Messages;
+digital_input			Get_Messages;
+digital_input 			Notification_Message_Pulse[cMax_Messages];
+
+
+string_input			_SKIP_;
+string_input 			ucmd$[255];
+string_input			_SKIP_;
+string_input 			Notification_Message$[cMax_Messages][cMax_MessageSize];
+string_input 			Message_Command$[cMax_Messages][cMax_MessageSize];
+
+digital_output			_SKIP_;
+digital_output			_SKIP_;
+digital_output			_SKIP_;
+digital_output			_SKIP_;
+digital_output			InitializationComplete;
+digital_output			_SKIP_;
+digital_output			_SKIP_;
+digital_output			_SKIP_;
+digital_output			_SKIP_;
+digital_output			_SKIP_;
+digital_output			_SKIP_;
+digital_output			_SKIP_;
+digital_output			Command_Pulse_[cMax_Messages];
+
+string_output			_SKIP_;
+string_output			Message$;
+
+string_parameter		AccessToken[100];
+string_parameter		UserEmail[100];
+string_parameter		SystemName[100];
+
+
+
+///// Variables ///////////////////////////////////////////
+PushBulletNotifier PushBulletNotices;
+
+integer i;
+integer nNotificationMessages;
+integer nNotificationMessagePulses;
+integer nMessageCommands;
+integer nMessageCommandPulses;
+
+
+///// Functions////////////////////////////////////////////
+callback function HandleInitializationCompleteFeedback(integer state)	
+{
+ 	InitializationComplete = state;
+}
+
+callback function HandlePushBulletEventFeedback(integer join, integer state)	
+{
+ 	Command_Pulse_[join] = state;
+}
+
+callback function OnNotice(string Message)
+{
+	Message$ = Message;
+}
+ 
+function UpdateModuleMessages()
+{
+ 	//Update message command list defined on module
+	for(i = 1 to nNotificationMessages)
+	{
+        PushBulletSystem.AddNotificationMessage(i, Notification_Message$[i]);
+	}
+
+	//Update message command list defined on module
+	for(i = 1 to nMessageCommands)
+	{
+        PushBulletSystem.AddMessageCommand(i, Message_Command$[i]);
+	}
+
+	PushBulletSystem.PrintMessageCommands();
+}
+
+ 
+///// Events //////////////////////////////////////////////////
+change ucmd$
+{
+	PushBulletSystem.UserCommand(ucmd$);
+}
+
+change Notification_Message$
+{
+	PushBulletSystem.AddNotificationMessage(getLastModifiedArrayIndex(), Notification_Message$[getLastModifiedArrayIndex()]);
+}
+
+change Message_Command$
+{
+    PushBulletSystem.AddMessageCommand(getLastModifiedArrayIndex(), Message_Command$[getLastModifiedArrayIndex()]);
+}
+
+push Initialize
+{
+	integer i;
+
+	registerDelegate(PushBulletNotices, NoticeHandler, OnNotice);
+	registerDelegate(PushBulletSystem, SplusInitializationCompleteFeedback, HandleInitializationCompleteFeedback);
+	registerDelegate(PushBulletSystem, SplusPushBulletEventFeedback, HandlePushBulletEventFeedback);
+
+    PushBulletSystem.AccessToken = AccessToken;
+	PushBulletSystem.UserEmail = UserEmail;
+	PushBulletSystem.SystemName = SystemName;
+    PushBulletSystem.Initialize();
+    
+
+    //Push message information to module
+	For(nNotificationMessagePulses = cMax_Messages to 1 Step -1)
+    {
+     	If(IsSignalDefined(Notification_Message_Pulse[nNotificationMessagePulses])) 				//Get Total Number of Notification Messages being used (As Defined)
+		{
+       		Break;
+		} 	 
+	}
+
+	//Push message information to module
+	For(nNotificationMessages = cMax_Messages to 1 Step -1)
+    {
+     	If(IsSignalDefined(Notification_Message$[nNotificationMessages])) 				//Get Total Number of Notification Messages being used (As Defined)
+		{
+       		Break;
+		} 	 
+	}
+ 
+	//Get number to make sure programmer added the same number
+	For(nMessageCommands = cMax_Messages to 1 Step -1)
+    {
+     	If(IsSignalDefined(Message_Command$[nMessageCommands])) 			//Get Total Number of Messages Cpmmands being used (As Defined)
+		{
+       		Break;
+		} 	 
+	}
+ 
+	//Get number to make sure programmer added the same number
+	For(nMessageCommandPulses = cMax_Messages to 1 Step -1)
+    {
+     	If(IsSignalDefined(Command_Pulse_[nMessageCommandPulses])) 			//Get Total Number of Messages Command Pulses being used (As Defined)
+		{
+       		Break;
+		} 	 
+	}
+}
+
+push Reset_Connection
+{
+	PushBulletSystem.ResetConnection();
+}
+
+push Close_Connection
+{
+  	PushBulletSystem.CloseConnection();
+}
+
+push Update_Messages
+{
+    PushBulletSystem.PrintMessageCommands();	
+}
+
+push Get_Messages
+{
+	PushBulletSystem.GetPushInformation();
+}
+
+push Delete_All_Messages
+{
+    PushBulletSystem.DeleteAllPushes();
+}
+
+push Notification_Message_Pulse
+{
+    PushBulletSystem.SendNote(getLastModifiedArrayIndex());
+}
+
+
+
